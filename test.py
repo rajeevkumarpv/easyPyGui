@@ -1,19 +1,37 @@
-import os
-import sys
+from src import easyPyGui as es
+import tkinter as tk
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
-import easyPyGui.easyPyGui as es
 
-# Set GUI parameters: currently supports 'python' as language and 'tkinter' as gui_library.
-print('language,library', es.setgui('python', 'tkinter'))
+def btn():
+    print("Button Clicked")
 
-# Define layout as a list of widget definitions.
-layout = [
-    {'name': 'LabelWidget', 'code': 'tk.Label(root, text="Hello World!")'},
-    {'name': 'ButtonWidget', 'code': 'tk.Button(root, text="Click Me!")'}
+
+layout1 = [
+    es.Label("l1", anchor=tk.CENTER),  # check no two labels are same
+    es.TextField("text1", font=("calibre", 10, "bold")),
+    es.Button("Click Me", key="btn1", command=btn),
+    es.RadioButton(
+        options={
+            "RadioButton 1": "1",
+            "RadioButton 2": "2",
+            "RadioButton 3": "3",
+            "RadioButton 4": "4",
+            "RadioButton 5": "5",
+        },
+        key="radio1",
+        group="group1",
+    ),
+    es.TextArea("text box 1"),
 ]
-
-# Create a window with the given layout.
-window1 = es.create_window(name='First Window', layout=layout)
-print(window1)
-window1.show()
+layout2 = [
+    es.Label("l2", anchor=tk.CENTER),  # check no two labels are same
+    es.TextField("text2"),
+    # es.TextArea("text box 2"),
+    es.CheckBox("Accept Terms", checked=True, key="chk1"),
+    es.ListBox(["Item 1", "Item 2", "Item 3"], key="list1", selectmode=tk.SINGLE),
+]
+mainwindow = es.Window(title="SimpleCalculator", layout=layout1)
+anotherwindow = es.Window(title="ScientificCalculator", layout=layout2)
+mainwindow.show()
+anotherwindow.show()
+tk.mainloop()
