@@ -1,59 +1,121 @@
 import tkinter as tk
+import config as gv
+
+widget_types = {
+    "Label": 1,
+    "Button": 2,
+    "TextField": 3,
+    "TextArea": 4,
+    "ListBox": 5,
+    "Radio": 6,
+    "CheckBox": 7,
+    "Frame": 8,
+}
+
+# Store in tables using widget_uid as the primary key
+gv.TABLE_WINDOWS = {}
+gv.TABLE_WIDGETS = {}
+gv.TABLE_FRAMES = {}
 
 
 class Widget:
     """
-    A class representing a generic GUI widget.
+    A class representing a UI widget in the EasyPyGui framework.
 
     Attributes:
-        uid (int): Unique identifier for each widget.
-        key (str): A unique key for quick access.
-        root_widget (tk.Widget): The actual tkinter widget instance.
-        parent_name (str): The name of the parent window or frame.
-        child_widgets (list): A list to store child widgets if the widget is a container.
+        widget_uid (int): Unique identifier for the widget (auto-incremented).
+        key (str): A key to reference the widget in the application.
+        widget_type (str): The type of the widget (e.g., button, textbox).
+        row (int): The grid row position of the widget.
+        column (int): The grid column position of the widget.
+        sticky (str): Defines how the widget expands (e.g., "N", "E", "S", "W").
+        extra_arguments (dict): Additional configuration options for the widget.
+        parent_root (object): The parent container (window or frame) of the widget.
+        root (object): The widget's root instance in Tkinter.
+        values (list): A dynamic list for storing widget-related values.
     """
 
-    _uid_counter = 1  # Class-level counter to assign unique IDs
+    _uid_counter = 0  # Internal counter for widget_uid
 
-    def __init__(self, widget_type, key=None, **kwargs):
-        """
-        Initializes a new Widget instance.
-
-        Args:
-            widget_type (str): The type of tkinter widget (e.g., "Label", "Button").
-            key (str): A unique key for the widget.
-            **kwargs: Additional arguments needed for widget creation.
-        """
-        self.uid = Widget._uid_counter
+    def __init__(
+        self,
+        widget_type=None,
+        key=None,
+        row: int = 0,
+        column: int = 0,
+        sticky: str = "N",
+        **kwargs,
+    ):
+        """Initialize a Widget instance with an auto-incremented UID."""
         Widget._uid_counter += 1
+        self.widget_uid = Widget._uid_counter
 
-        self.type = widget_type
-        self.args = kwargs
-        self.key = key if key else f"widget_{self.uid}"
-        self.parent_name = ""
-        self.child_widgets = []  # For container widgets that hold child widgets
-        self.root_widget = None  # Will later hold the actual tkinter widget instance
+        # Assign key based on provided key or 'text' argument
+        if key is None and "text" in kwargs:
+            self.key = kwargs["text"]
+        elif key:
+            self.key = key
+        else:
+            self.key = f"widget_{self.widget_uid}"
+
+        self.widget_type = widget_types[widget_type]
+        self.row = row
+        self.column = column
+        self.sticky = sticky
+        self.extra_arguments = kwargs  # Store additional arguments
+        self.parent_root = None  # Window or frame container
+        self.root = None  # Widget's root instance
+        self.in_frame = False  # check if widget is part of frame
+        self.values = []  # Dynamic values
+        self.event = None  # Event placeholder
+        self.value = None  # Event-generated value (e.g., selected list index)
+
+        # Store the widget in the gv.TABLE_WIDGETS dictionary
+        gv.TABLE_WIDGETS[self.widget_uid] = {
+            "widget_self": self,
+            "widget_uid": self.widget_uid,
+            "key": self.key,
+            "parent_root": self.parent_root,
+            "self_root": self.parent_root,
+            "widget_type": self.widget_type,
+            "in_frame": self.in_frame,
+            "row": self.row,
+            "column": self.column,
+            "sticky": self.sticky,
+            "extra_arguments": self.extra_arguments,
+            "event": self.event,
+            "value": self.value,
+        }
+
+    def __repr__(self):
+        """Return a string representation of the Widget instance."""
+        return (
+            f"Widget({self.widget_uid}, {self.key}, {self.widget_type}, "
+            f"row={self.row}, column={self.column}, sticky={self.sticky}, extra={self.extra_arguments})"
+        )
 
 
 class Window:
     """
-    Class representing a GUI window using tkinter.
+    A class representing a window in the EasyPyGui framework.
 
     Attributes:
-        title (str): The title of the window.
         uid (int): Unique identifier for the window.
-        root (tk.Tk or tk.Toplevel): The main tkinter window or a child window.
-        child_widgets (list): List of child widget instances added to the window.
+        title (str): The title of the window.
+        layout (list): The layout of widgets inside the window.
+        size (tuple): The size of the window (width, height).
         hidden (bool): Whether the window is initially hidden.
-        layout (list): A list defining the configuration of child widgets.
+        root (tk.Tk or tk.Toplevel): The root instance of the window.
+        child_widgets (list): A list of widgets contained in the window.
     """
 
-    _uid_counter = 1  # Class-level UID counter
-    _root_instance = None  # Class-level variable to hold the first Tk instance
+    _uid_counter = 1
+    _root_instance = None
 
-    def __init__(self, title, layout=None, hidden=True):
+    def __init__(self, title, layout=None, size=(100, 100), hidden=True):
+        """Initialize a Window instance."""
         self.title = title
-        self.uid = Window._uid_counter
+        self.window_uid = Window._uid_counter
         Window._uid_counter += 1
 
         if Window._root_instance is None:
@@ -67,139 +129,43 @@ class Window:
         if self.hidden:
             self.root.withdraw()
 
-        self.child_widgets = []
+        self.child_widget_uids = []
         self.layout = layout if layout else []
-        self._initialize_layout()
-        self.root.protocol("WM_DELETE_WINDOW", self.hide)
+        #populate tables
+        self.init_layout(layout=layout)
 
-    def _initialize_layout(self):
-        """Create and pack widgets based on the given layout."""
-        for wg in self.layout:
-            if wg.type == "Label":
-                if "text" not in wg.args:
-                    raise ValueError("Label widget must have a 'text' argument")
-                text_value = wg.args.pop("text")
-                wg.root_variable = tk.StringVar()
-                wg.root_variable.set(text_value)
-                wg.root_widget = tk.Label(
-                    self.root,
-                    textvariable=wg.root_variable,
-                    **(wg.args if wg.args else {}),
-                )
-                wg.root_widget.pack()
-                self.child_widgets.append([wg.uid, wg.root_widget, wg.root_variable])
-
-            elif wg.type == "TextField":
-                if "text" not in wg.args:
-                    raise ValueError("TextField widget must have a 'text' argument")
-                text_value = wg.args.pop("text")
-                wg.root_variable = tk.StringVar()
-                wg.root_variable.set(text_value)
-                wg.root_widget = tk.Entry(
-                    self.root,
-                    textvariable=wg.root_variable,
-                    **(wg.args if wg.args else {}),
-                )
-                wg.root_widget.pack()
-                self.child_widgets.append([wg.uid, wg.root_widget, wg.root_variable])
-
-            elif wg.type == "TextArea":
-                if "text" not in wg.args:
-                    raise ValueError("TextArea widget must have a 'text' argument")
-                text_value = wg.args.pop("text")
-                wg.root_widget = tk.Text(self.root, **(wg.args if wg.args else {}))
-                wg.root_widget.insert(tk.INSERT, text_value)
-                wg.root_widget.pack()
-                self.child_widgets.append([wg.uid, wg.root_widget, None])
-
-            elif wg.type == "Button":
-                if "text" not in wg.args:
-                    raise ValueError("Button widget must have a 'text' argument")
-                if "command" not in wg.args:
-                    raise ValueError("Button widget must have a 'command' argument")
-                text_value = wg.args.pop("text")
-                wg.root_widget = tk.Button(
-                    self.root, text=text_value, **(wg.args if wg.args else {})
-                )
-                wg.root_widget.pack()
-                self.child_widgets.append([wg.uid, wg.root_widget,None])
-
-            elif wg.type == "CheckBox":
-                if "text" not in wg.args:
-                    raise ValueError("CheckBox widget must have a 'text' argument")
-                text_value = wg.args.pop("text")
-                wg.root_variable = tk.BooleanVar()
-                checked = wg.args.pop("checked", False)
-                wg.root_variable.set(checked)
-                wg.root_widget = tk.Checkbutton(
-                    self.root,
-                    text=text_value,
-                    variable=wg.root_variable,
-                    **(wg.args if wg.args else {}),
-                )
-                wg.root_widget.pack()
-                self.child_widgets.append([wg.uid, wg.root_widget, wg.root_variable])
-
-            elif wg.type == "RadioButton":
-                if "options" not in wg.args:
-                    raise ValueError(
-                        "RadioButton widget must have an 'options' argument"
-                    )
-                options = wg.args.pop("options")
-                # Optional: use 'group' if provided (for logical grouping)
-                group = wg.args.pop("group", None)
-                wg.root_variable = tk.StringVar()
-                # Set default value to the first option
-                first_value = next(iter(options.values()))
-                wg.root_variable.set(first_value)
-                # Create a container frame to hold radio buttons
-                frame = tk.Frame(self.root)
-                frame.pack()
-                wg.radio_buttons = []
-                for label, value in options.items():
-                    rb = tk.Radiobutton(
-                        frame,
-                        text=label,
-                        variable=wg.root_variable,
-                        value=value,
-                        **(wg.args if wg.args else {}),
-                    )
-                    rb.pack(anchor=tk.W)
-                    wg.radio_buttons.append(rb)
-                wg.root_widget = frame
-                self.child_widgets.append(
-                    [wg.uid, wg.root_widget, wg.root_variable, wg.radio_buttons]
-                )
-
-            elif wg.type == "ListBox":
-                if "items" not in wg.args:
-                    raise ValueError("ListBox widget must have an 'items' argument")
-                items = wg.args.pop("items")
-                wg.root_widget = tk.Listbox(self.root, **(wg.args if wg.args else {}))
-                for item in items:
-                    wg.root_widget.insert(tk.END, item)
-                wg.root_widget.pack()
-                self.child_widgets.append([wg.uid, wg.root_widget])
-
-            # Debug print for widget type and key
-            print(wg.type, wg.key)
-
-    def hide(self):
-        self.hidden = True
-        self.root.withdraw()
-
-    def show(self):
-        """Show the window and start the tkinter main loop."""
-        if self.hidden:
-            self.root.deiconify()
-            self.hidden = False
-        # Uncomment the following line if you want the main loop to run here:
-        # self.root.mainloop()
+    def init_layout(self, layout,parent='window'):
+        child_uids=[]
+        for row in layout:#widget collection
+            for col in row:#frame layout or widget
+                if col.widget_type == 8: 
+                    frame_child_uids=self.init_layout(col.extra_arguments['layout'],parent='frame')
+                    gv.TABLE_FRAMES[self.window_uid] = {
+                        "key": col.key,
+                        "frame_uid": col.widget_uid,
+                        "title": self.title,
+                        "window_uid": self.window_uid,
+                        "child_widgets_uids": frame_child_uids,
+                    }
+                    child_uids.append(col.widget_uid)
+                else:
+                    child_uids.append(col.widget_uid)
+        if parent!='window':
+            return child_uids
+        gv.TABLE_WINDOWS[self.window_uid] = {
+                    "title": self.title,
+                    "window_root": self.root,
+                    "window_uid": self.window_uid,
+                    "child_widgets_uids": child_uids,
+                }
 
 
-# Factory functions for creating widgets
+
+        
+
+
 def Label(text, key=None, **kwargs):
-    return Widget("Label", key=key, text=text, **kwargs)
+    return Widget(widget_type="Label", key=key, text=text, **kwargs)
 
 
 def TextField(default_text, key=None, **kwargs):
@@ -223,34 +189,30 @@ def CheckBox(text, checked=False, key=None, **kwargs):
 def RadioButton(options, key=None, group=None, **kwargs):
     if group:
         kwargs["group"] = group
-    return Widget("RadioButton", key=key, options=options, **kwargs)
+    return Widget("Radio", key=key, options=options, **kwargs)
 
 
 def ListBox(items, key=None, **kwargs):
     return Widget("ListBox", key=key, items=items, **kwargs)
 
 
-# Example usage: creating a layout with the new widget types.
-layout1 = [
-    Label("Label 1", anchor=tk.CENTER),  # Unique label text
-    TextField("Sample text", font=("calibre", 10, "bold")),
-    TextArea("This is a text area"),
-    Button("Click Me", key="btn1", command=lambda: print("Button Clicked")),
-    RadioButton(
-        options={
-            "RadioButton 1": "1",
-            "RadioButton 2": "2",
-            "RadioButton 3": "3",
-            "RadioButton 4": "4",
-            "RadioButton 5": "5",
-        },
-        key="radio1",
-        group="group1",
-    ),
-    CheckBox("Accept Terms", checked=True, key="chk1"),
-    ListBox(["Item 1", "Item 2", "Item 3"], key="list1", selectmode=tk.SINGLE),
-]
+def Frame(text, key, **kwargs):
+    # Use "layout" or "values" to define nested layouts.
+    child_widgets = []
+    for widget in kwargs["layout"]:
+        widget = widget[0]  # NOTE nested frames
+        widget.in_frame = True
+        widget_uid = widget.widget_uid
+        gv.TABLE_WIDGETS[widget_uid]["in_frame"] = True
 
-# Create the window and show it
-# win = Window("My GUI Window", layout=layout1, hidden=False)
-# win.root.mainloop()
+        child_widgets.append(widget_uid)
+    # key is used instead of uid
+    # gv.TABLE_FRAMES[key] = {
+    #     "title": text,
+    #     "window_uid": None,
+    #     "child_widget_uids": child_widgets,
+    # }
+    if text is not None:
+        return Widget("Frame", key=key, text=text, **kwargs)
+    else:
+        return Widget("Frame", key=key, **kwargs)

@@ -1,37 +1,46 @@
 from src import easyPyGui as es
 import tkinter as tk
+import config as gv
 
-
-def btn():
-    print("Button Clicked")
-
-
-layout1 = [
-    es.Label("l1", anchor=tk.CENTER),  # check no two labels are same
-    es.TextField("text1", font=("calibre", 10, "bold")),
-    es.Button("Click Me", key="btn1", command=btn),
-    es.RadioButton(
-        options={
-            "RadioButton 1": "1",
-            "RadioButton 2": "2",
-            "RadioButton 3": "3",
-            "RadioButton 4": "4",
-            "RadioButton 5": "5",
-        },
-        key="radio1",
-        group="group1",
-    ),
-    es.TextArea("text box 1"),
+radio1 = [
+    [
+        es.RadioButton(
+            options={
+                "RadioButton 1": "1",
+                "RadioButton 2": "2",
+                "RadioButton 3": "3",
+                "RadioButton 4": "4",
+                "RadioButton 5": "5",
+            },
+            key="radio1",
+        ),
+    ],
+    [
+        es.Button("btn", key="btn2"),
+        es.Button("btn2", key="btn3"),
+    ],
 ]
-layout2 = [
-    es.Label("l2", anchor=tk.CENTER),  # check no two labels are same
-    es.TextField("text2"),
-    # es.TextArea("text box 2"),
-    es.CheckBox("Accept Terms", checked=True, key="chk1"),
-    es.ListBox(["Item 1", "Item 2", "Item 3"], key="list1", selectmode=tk.SINGLE),
+layout1 = [
+    [
+        es.Label("l1", anchor=tk.CENTER),
+        es.TextField("text1", font=("calibre", 10, "bold")),
+    ],
+        [es.Frame("options","options", layout=radio1)],
+        [
+            es.Button("Click Me", key="btn1"),
+        ],
 ]
 mainwindow = es.Window(title="SimpleCalculator", layout=layout1)
-anotherwindow = es.Window(title="ScientificCalculator", layout=layout2)
-mainwindow.show()
-anotherwindow.show()
-tk.mainloop()
+# mainwindow.show()
+while True:
+    #     event, values = mainwindow.read_window(seconds=0.01)
+    #     if event is not None:
+    #         if event == "btn1":
+    #             print(mainwindow.get("radio1"))
+    #         if event == "radio1":
+    #             print(f"Radio Pressed: {values.get(event)}")
+    #         if event == "widget_5":
+    #             print(f"Text: {values.get(event)}")
+    """"""
+
+# # consider using pack for widgets in single row or column (by len widgets in row may be) and grid to scrollable items such as lsitbox,textarea.
