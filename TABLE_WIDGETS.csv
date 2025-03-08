@@ -1,0 +1,3 @@
+column,event,extra_arguments,in_frame,key,parent_root,row,self_root,sticky,value,widget_self,widget_type,widget_uid
+0,,"{'text': 'R0C0', 'anchor': 'center'}",False,R0C0,.,0,.!label,N,,"Widget(1, R0C0, 1, row=0, column=0, sticky=N, extra={'text': 'R0C0', 'anchor': 'center'})",1,1
+0,,"{'text': 'R0C1', 'anchor': 'center'}",False,R0C1,.,0,.!label2,N,,"Widget(2, R0C1, 1, row=0, column=0, sticky=N, extra={'text': 'R0C1', 'anchor': 'center'})",1,2

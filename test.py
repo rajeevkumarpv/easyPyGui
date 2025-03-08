@@ -2,45 +2,31 @@ from src import easyPyGui as es
 import tkinter as tk
 import config as gv
 
-radio1 = [
-    [
-        es.RadioButton(
-            options={
-                "RadioButton 1": "1",
-                "RadioButton 2": "2",
-                "RadioButton 3": "3",
-                "RadioButton 4": "4",
-                "RadioButton 5": "5",
-            },
-            key="radio1",
-        ),
-    ],
-    [
-        es.Button("btn", key="btn2"),
-        es.Button("btn2", key="btn3"),
-    ],
-]
-layout1 = [
-    [
-        es.Label("l1", anchor=tk.CENTER),
-        es.TextField("text1", font=("calibre", 10, "bold")),
-    ],
-        [es.Frame("options","options", layout=radio1)],
-        [
-            es.Button("Click Me", key="btn1"),
-        ],
-]
-mainwindow = es.Window(title="SimpleCalculator", layout=layout1)
-# mainwindow.show()
-while True:
-    #     event, values = mainwindow.read_window(seconds=0.01)
-    #     if event is not None:
-    #         if event == "btn1":
-    #             print(mainwindow.get("radio1"))
-    #         if event == "radio1":
-    #             print(f"Radio Pressed: {values.get(event)}")
-    #         if event == "widget_5":
-    #             print(f"Text: {values.get(event)}")
-    """"""
+import csv
+import config as gv
 
-# # consider using pack for widgets in single row or column (by len widgets in row may be) and grid to scrollable items such as lsitbox,textarea.
+# Example usage (if needed)
+if __name__ == "__main__":
+    # Create a window layout with a mix of widgets
+    layout = [
+        [
+            es.Label("This is a label", key="lbl1"),
+            es.Button("Click me", key="btn1"),
+            es.Slider(0, 100, key="slider1"),
+        ],
+        [
+            es.TextField("Default text", key="txt1"),
+            es.ComboBox(["Option 1", "Option 2"], key="cmb1"),
+            es.ProgressBar(key="pbar1", mode="determinate", maximum=100),
+        ],
+        [
+            es.Frame(
+                "Frame Title", key="frm1", layout=[[es.Label("Inside frame", key="lbl2")]]
+            )
+        ],
+    ]
+    win = es.Window("My App", layout=layout, size=(400, 300), hidden=False)
+    # win.show()
+    for row in (gv.TABLE_WIDGETS):
+        print(row,gv.TABLE_WIDGETS[row],'\n\n')
+    tk.mainloop()
