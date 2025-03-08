@@ -4,13 +4,12 @@ import config as gv
 
 import csv
 import config as gv
-
 # Example usage (if needed)
 if __name__ == "__main__":
     # Create a window layout with a mix of widgets
     layout = [
         [
-            es.Label("This is a label", key="lbl1"),
+            es.Label("This is a label", key="lbl1",sticky='N'),
             es.Button("Click me", key="btn1"),
             es.Slider(0, 100, key="slider1"),
         ],
@@ -29,4 +28,20 @@ if __name__ == "__main__":
     # win.show()
     for row in (gv.TABLE_WIDGETS):
         print(row,gv.TABLE_WIDGETS[row],'\n\n')
-    tk.mainloop()
+    # tk.mainloop()#use update
+    while True:
+        events,values=win.read_events(seconds=0.06)#milliseconds to wait
+        if events == None:
+            continue
+        if events=='--Exit--':#do not destroy automatically
+            win.hide() #hides window
+            win.show() #shows window
+            win.unload()#destroy window even if its root level
+            break;
+        if events=='btn1':
+            print(f"text entered{values['txt1']}")#values contain all values for all widgets in dict 
+            win.set('txt1','')
+        if events=='cmb1':
+            selection=values['cmb1']
+            print(f'Selected {win.get('cmb1')[selection]}')
+        print(events)

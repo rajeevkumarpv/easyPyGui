@@ -63,7 +63,7 @@ class Widget:
         self.value = None  # Event-generated value
 
         gv.TABLE_WIDGETS[self.widget_uid] = {
-            "widget_self": self,
+            "widget_self": self,  # widget itself, for purposes like variable values
             "widget_uid": self.widget_uid,
             "key": self.key,
             "parent_root": self.parent_root,
@@ -73,7 +73,7 @@ class Widget:
             "row": self.row,
             "column": self.column,
             "sticky": self.sticky,
-            "extra_arguments": self.extra_arguments,
+            "extra_arguments": self.extra_arguments,  # not updated to table
             "event": self.event,
             "value": self.value,
         }
@@ -112,6 +112,17 @@ class Window:
         self.grid_rows = len(layout)
         self.grid_cols = 0
 
+        # Initialize event storage for widget and window events.
+        self.last_event = None
+
+        # Store last window state and size for detecting changes.
+        self._last_window_state = self.root.state()
+        self._last_size = (self.root.winfo_width(), self.root.winfo_height())
+
+        # Bind window-level events.
+        self.root.bind("<Configure>", self._on_configure)
+        self.root.protocol("WM_DELETE_WINDOW", self._on_exit)
+
         # Populate tables and assign layout
         self.init_layout(layout=layout)
         self.root.geometry(f"{size[0]}x{size[1]}")
@@ -144,6 +155,7 @@ class Window:
         if parent != "window":
             return child_uids
         gv.TABLE_WINDOWS[self.window_uid] = {
+            "window_self": self,
             "title": self.title,
             "window_root": self.root,
             "window_uid": self.window_uid,
@@ -177,44 +189,118 @@ class Window:
                     )
                 else:
                     gv.TABLE_WIDGETS[col.widget_uid]["parent_root"] = parent_root
-                    # Create widget based on its type
+
+                    # Create widget based on its type with event binding.
                     if col.widget_type == widget_types["Label"]:
                         widget_instance = ttk.Label(parent_root, **col.extra_arguments)
+                        widget_instance.bind(
+                            "<Button-1>", lambda e, key=col.key: self._handle_event(key)
+                        )
                     elif col.widget_type == widget_types["Button"]:
-                        widget_instance = ttk.Button(parent_root, **col.extra_arguments)
+                        if "command" not in col.extra_arguments:
+                            widget_instance = ttk.Button(
+                                parent_root,
+                                text=col.extra_arguments.get("text", ""),
+                                command=lambda key=col.key: self._handle_event(key),
+                            )
+                        else:
+                            orig_cmd = col.extra_arguments["command"]
+                            widget_instance = ttk.Button(
+                                parent_root,
+                                text=col.extra_arguments.get("text", ""),
+                                command=lambda key=col.key, orig=orig_cmd: (
+                                    orig(),
+                                    self._handle_event(key),
+                                ),
+                            )
                     elif col.widget_type == widget_types["TextField"]:
                         widget_instance = ttk.Entry(parent_root, **col.extra_arguments)
+                        widget_instance.bind(
+                            "<KeyRelease>",
+                            lambda e, key=col.key: self._handle_event(key),
+                        )
                     elif col.widget_type == widget_types["TextArea"]:
                         widget_instance = tk.Text(parent_root, **col.extra_arguments)
+                        widget_instance.bind(
+                            "<KeyRelease>",
+                            lambda e, key=col.key: self._handle_event(key),
+                        )
                     elif col.widget_type == widget_types["ListBox"]:
                         widget_instance = tk.Listbox(parent_root, **col.extra_arguments)
+                        widget_instance.bind(
+                            "<<ListboxSelect>>",
+                            lambda e, key=col.key: self._handle_event(key),
+                        )
                     elif col.widget_type == widget_types["Radio"]:
-                        # For radio buttons, create one for each option.
                         var = tk.StringVar()
+                        var.trace(
+                            "w", lambda *args, key=col.key: self._handle_event(key)
+                        )
                         options = col.extra_arguments.get("options", [])
                         for idx, option in enumerate(options):
                             rb = ttk.Radiobutton(
                                 parent_root, text=option, variable=var, value=option
                             )
                             rb.grid(column=_cols_no, row=row_no + idx)
-                        widget_instance = rb  # assign the last one for reference
+                        widget_instance = rb
                     elif col.widget_type == widget_types["CheckBox"]:
-                        widget_instance = ttk.Checkbutton(
-                            parent_root, **col.extra_arguments
-                        )
+                        if "command" not in col.extra_arguments:
+                            widget_instance = ttk.Checkbutton(
+                                parent_root,
+                                **col.extra_arguments,
+                                command=lambda key=col.key: self._handle_event(key),
+                            )
+                        else:
+                            orig_cmd = col.extra_arguments["command"]
+                            widget_instance = ttk.Checkbutton(
+                                parent_root,
+                                **col.extra_arguments,
+                                command=lambda key=col.key, orig=orig_cmd: (
+                                    orig(),
+                                    self._handle_event(key),
+                                ),
+                            )
                     elif col.widget_type == widget_types["Slider"]:
-                        widget_instance = tk.Scale(parent_root, **col.extra_arguments)
+                        if "command" not in col.extra_arguments:
+                            widget_instance = tk.Scale(
+                                parent_root,
+                                **col.extra_arguments,
+                                command=lambda val, key=col.key: self._handle_event(
+                                    key
+                                ),
+                            )
+                        else:
+                            orig_cmd = col.extra_arguments["command"]
+                            widget_instance = tk.Scale(
+                                parent_root,
+                                **col.extra_arguments,
+                                command=lambda val, key=col.key, orig=orig_cmd: (
+                                    orig(val),
+                                    self._handle_event(key),
+                                ),
+                            )
                     elif col.widget_type == widget_types["ComboBox"]:
                         widget_instance = ttk.Combobox(
                             parent_root, **col.extra_arguments
+                        )
+                        widget_instance.bind(
+                            "<<ComboboxSelected>>",
+                            lambda e, key=col.key: self._handle_event(key),
                         )
                     elif col.widget_type == widget_types["ProgressBar"]:
                         widget_instance = ttk.Progressbar(
                             parent_root, **col.extra_arguments
                         )
+                        widget_instance.bind(
+                            "<Button-1>", lambda e, key=col.key: self._handle_event(key)
+                        )
                     elif col.widget_type == widget_types["TreeView"]:
                         widget_instance = ttk.Treeview(
                             parent_root, **col.extra_arguments
+                        )
+                        widget_instance.bind(
+                            "<<TreeviewSelect>>",
+                            lambda e, key=col.key: self._handle_event(key),
                         )
                     else:
                         widget_instance = ttk.Label(parent_root, text="Unknown Widget")
@@ -225,12 +311,143 @@ class Window:
                 _cols_no += 1
             row_no += 1
 
+    def _handle_event(self, key):
+        """
+        Internal handler to capture widget events.
+        Every interactive widget calls this on user interaction.
+        """
+        self.last_event = key
+
+    def _on_configure(self, event):
+        """
+        Handle window-level events such as resize, minimize, maximize/restore.
+        This method is bound to the <Configure> event of the window.
+        """
+        # Check for size changes.
+        current_size = (event.width, event.height)
+        if current_size != self._last_size:
+            self._last_size = current_size
+            self.last_event = "--Resize--"
+
+        # Check for state changes (minimized, maximized, normal).
+        new_state = self.root.state()
+        if new_state != self._last_window_state:
+            self._last_window_state = new_state
+            if new_state == "iconic":
+                self.last_event = "--Minimize--"
+            elif new_state == "zoomed":
+                self.last_event = "--Maximize--"
+            elif new_state == "normal":
+                # When restoring from minimized/maximized state.
+                self.last_event = "--Restore--"
+
+    def _on_exit(self):
+        """
+        Handle window exit (clicking the close button).
+        """
+        self.last_event = "--Exit--"
+        self.root.destroy()
+
+    def read_events(self, seconds=0):
+        try:
+            self.root.update_idletasks()
+            self.root.update()
+        except tk.TclError:
+            return None, {}
+
+        event = self.last_event
+        self.last_event = None
+
+        values = {}
+        for widget_uid, widget_data in gv.TABLE_WIDGETS.items():
+            key = widget_data.get("key")
+            widget_instance = widget_data.get("self_root")
+            if widget_instance is None:
+                continue
+
+            try:
+                wtype = widget_data.get("widget_type")
+                if wtype == widget_types["TextField"]:
+                    values[key] = widget_instance.get()
+                elif wtype == widget_types["TextArea"]:
+                    values[key] = widget_instance.get("1.0", tk.END).strip()
+                elif wtype == widget_types["ComboBox"]:
+                    current = widget_instance.get()
+                    options = widget_instance.cget("values")
+                    try:
+                        values[key] = options.index(current)
+                    except ValueError:
+                        values[key] = None
+                elif wtype == widget_types["Slider"]:
+                    values[key] = widget_instance.get()
+                elif wtype == widget_types["ListBox"]:
+                    selection = widget_instance.curselection()
+                    values[key] = selection
+                elif wtype in (widget_types["CheckBox"], widget_types["Radio"]):
+                    values[key] = None  # Extend as needed.
+                elif wtype == widget_types["TreeView"]:
+                    values[key] = widget_instance.selection()
+                else:
+                    values[key] = ""
+            except tk.TclError:
+                # Widget has likely been destroyed; handle gracefully.
+                values[key] = None
+
+        return event, values
+
+    def Update(self, key, value):
+        """
+        Update the widget identified by 'key' with the given 'value'.
+        Currently supports TextField and TextArea.
+        """
+        for widget_uid, widget_data in gv.TABLE_WIDGETS.items():
+            if widget_data.get("key") == key:
+                widget_instance = widget_data.get("self_root")
+                if widget_instance is None:
+                    break
+                if widget_data.get("widget_type") == widget_types["TextField"]:
+                    widget_instance.delete(0, tk.END)
+                    widget_instance.insert(0, value)
+                elif widget_data.get("widget_type") == widget_types["TextArea"]:
+                    widget_instance.delete("1.0", tk.END)
+                    widget_instance.insert("1.0", value)
+                break
+
+    def set(self, key, value):
+        """
+        Alias for Update. Allows external code to set widget values.
+        """
+        self.Update(key, value)
+
+    def get(self, key):
+        """
+        Retrieve the widget content or configuration based on its type.
+        For TextField/TextArea it returns the current text.
+        For ComboBox it returns the list of options.
+        For Slider it returns its current value.
+        """
+        for widget_uid, widget_data in gv.TABLE_WIDGETS.items():
+            if widget_data.get("key") == key:
+                widget_instance = widget_data.get("self_root")
+                if widget_instance is None:
+                    break
+                wtype = widget_data.get("widget_type")
+                if wtype == widget_types["TextField"]:
+                    return widget_instance.get()
+                elif wtype == widget_types["TextArea"]:
+                    return widget_instance.get("1.0", tk.END).strip()
+                elif wtype == widget_types["ComboBox"]:
+                    return widget_instance.cget("values")
+                elif wtype == widget_types["Slider"]:
+                    return widget_instance.get()
+        return None
+
     def show(self):
         self.root.deiconify()
         self.hidden = False
 
 
-# Existing widget factory functions
+# Existing widget factory functions.
 def Label(text, key=None, **kwargs):
     return Widget(widget_type="Label", key=key, text=text, **kwargs)
 
@@ -277,7 +494,6 @@ def Frame(text, key, **kwargs):
         return Widget("Frame", key=key, **kwargs)
 
 
-# Additional widget factory functions
 def Slider(from_, to, orient="horizontal", key=None, **kwargs):
     """
     Create a slider (scale) widget.
@@ -304,6 +520,3 @@ def TreeView(key=None, **kwargs):
     Create a tree view widget.
     """
     return Widget("TreeView", key=key, **kwargs)
-
- a widget , once placed inside a frame, grid positions might need to be managed relative to the frame's grid.'
- TABLE is used for future ref so avoid redundancy of row,col and 'row','col' in widget
